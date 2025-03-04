@@ -12,8 +12,8 @@ declare global {
 		SpeechRecognition: typeof SpeechRecognition;
 		webkitSpeechRecognition: typeof SpeechRecognition;
 	}
-	var SpeechRecognition: any;
-	var webkitSpeechRecognition: any;
+	let SpeechRecognition: any;
+	let webkitSpeechRecognition: any;
 }
 
 export default function SpeechToText() {
@@ -28,7 +28,6 @@ export default function SpeechToText() {
 
 	useEffect(() => {
 		const messageHandler = ({ text }: { text: string }) => {
-			console.log("Received message:", text, targetLang);
 			setReceivedMessage(text);
 		};
 
@@ -97,6 +96,7 @@ export default function SpeechToText() {
 			});
 			return { status: true, text: res.data.text };
 		} catch (error) {
+			console.log("Error while translating:", error);
 			return { status: false, error: "Bir hata oluştu" };
 		}
 	};
@@ -108,8 +108,8 @@ export default function SpeechToText() {
 		}
 	};
 
-	const ttsHandler = ({ text, targetLang }: { text: string; targetLang: TargetLanguages }) => {
-		var msg = new SpeechSynthesisUtterance();
+	const ttsHandler = ({ targetLang }: { targetLang: TargetLanguages }) => {
+		const msg = new SpeechSynthesisUtterance();
 		msg.text = receivedMessage;
 		msg.lang = targetLang;
 		window.speechSynthesis.speak(msg);
@@ -176,7 +176,7 @@ export default function SpeechToText() {
 			)}
 			{receivedMessage && (
 				<div>
-					<Button onClick={() => ttsHandler({ text: translatedText, targetLang })}>Sesli Oku</Button>
+					<Button onClick={() => ttsHandler({ targetLang })}>Sesli Oku</Button>
 				</div>
 			)}
 		</div>
