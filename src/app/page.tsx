@@ -1,101 +1,194 @@
-import Image from "next/image";
+"use client";
+import { socket } from "@/socket";
+import axios from "axios";
+import { useState, useRef, useEffect } from "react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
+import { Button } from "@/components/ui/button";
+import { Toaster, toast } from "react-hot-toast";
 
-export default function Home() {
-  return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-8 row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-semibold">
-              src/app/page.tsx
-            </code>
-            .
-          </li>
-          <li>Save and see your changes instantly.</li>
-        </ol>
-
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:min-w-44"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
-        </div>
-      </main>
-      <footer className="row-start-3 flex gap-6 flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
-    </div>
-  );
+declare global {
+	interface Window {
+		SpeechRecognition: typeof SpeechRecognition;
+		webkitSpeechRecognition: typeof SpeechRecognition;
+	}
+	var SpeechRecognition: any;
+	var webkitSpeechRecognition: any;
 }
+
+export default function SpeechToText() {
+	const [text, setText] = useState("");
+	const [translatedText, setTranslatedText] = useState("");
+	const [isListening, setIsListening] = useState(false);
+	const [sourceLang, setSourceLang] = useState<TargetLanguages>(TargetLanguages.TR);
+	const [targetLang, setTargetLang] = useState<TargetLanguages>(TargetLanguages.EN);
+	const [receivedMessage, setReceivedMessage] = useState<string>("");
+
+	const recognitionRef = useRef<typeof SpeechRecognition | null>(null);
+
+	useEffect(() => {
+		const messageHandler = ({ text }: { text: string }) => {
+			console.log("Received message:", text, targetLang);
+			setReceivedMessage(text);
+		};
+
+		socket.on("message", messageHandler);
+
+		return () => {
+			socket.off("message", messageHandler); // Cleanup listener
+		};
+	}, [receivedMessage]);
+
+	const startListening = async () => {
+		if (!window.SpeechRecognition && !window.webkitSpeechRecognition) {
+			toast.error("Tarayıcınız ses dinleme özelliğini desteklemiyor");
+			return;
+		}
+		if (!sourceLang && !targetLang) {
+			toast.error("Konuşulan ve hedef dili seçmelisiniz");
+			return;
+		}
+		let transcript = "";
+		const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+		const recognition = new SpeechRecognition();
+		recognitionRef.current = recognition;
+
+		recognition.lang = sourceLang; // Change language if needed
+		recognition.continuous = true; // Keep listening
+		recognition.interimResults = true; // Get real-time results
+
+		recognition.onstart = () => setIsListening(true);
+		recognition.onresult = async (event: any) => {
+			let finalTranscript = "";
+			for (let i = 0; i < event.results.length; i++) {
+				finalTranscript += event.results[i][0].transcript + " ";
+			}
+			setText(finalTranscript);
+			transcript = finalTranscript;
+			console.log(finalTranscript);
+		};
+
+		recognition.onerror = (event: any) => {
+			console.error("Speech recognition error:", event.error);
+		};
+
+		recognition.onend = async () => {
+			if (isListening) {
+				recognition.start(); // Restart if still active
+			} else {
+				setIsListening(false);
+				const translatedText = await translate(transcript, targetLang!);
+				if (translatedText.status) {
+					console.log("Translated text: socket emit", translatedText.text);
+					setTranslatedText(translatedText.text);
+					socket.emit("message", { text: translatedText.text, targetLang });
+				}
+			}
+		};
+
+		recognition.start();
+	};
+
+	const translate = async (text: string, targetLang: TargetLanguages) => {
+		try {
+			const res = await axios.post("/api/translate", {
+				text,
+				targetLang,
+			});
+			return { status: true, text: res.data.text };
+		} catch (error) {
+			return { status: false, error: "Bir hata oluştu" };
+		}
+	};
+
+	const stopListening = () => {
+		if (recognitionRef.current) {
+			recognitionRef.current.stop();
+			setIsListening(false);
+		}
+	};
+
+	const ttsHandler = ({ text, targetLang }: { text: string; targetLang: TargetLanguages }) => {
+		var msg = new SpeechSynthesisUtterance();
+		msg.text = receivedMessage;
+		msg.lang = targetLang;
+		window.speechSynthesis.speak(msg);
+	};
+
+	return (
+		<div className="w-full min-h-screen flex flex-col items-center py-20 gap-5">
+			<Toaster
+				position="top-center"
+				reverseOrder={false}
+			/>
+			{/* KONUŞULAN DİL */}
+			<div>
+				<Label className="mb-2">KONUŞULAN DİL:</Label>
+				<Select
+					onValueChange={(val) => {
+						setSourceLang(val as TargetLanguages);
+					}}
+					defaultValue={TargetLanguages.TR}>
+					<SelectTrigger className="w-[180px]">
+						<SelectValue placeholder="Konuşulan Dil" />
+					</SelectTrigger>
+					<SelectContent className="bg-black">
+						{Object.entries(languages).map(([code, name]) => (
+							<SelectItem
+								value={code}
+								key={code}>
+								{name}
+							</SelectItem>
+						))}
+					</SelectContent>
+				</Select>
+			</div>
+			{/* HEDEF DİL */}
+			<div>
+				<Label className="mb-2">HEDEF Dil:</Label>
+				<Select
+					onValueChange={(val) => {
+						setTargetLang(val as TargetLanguages);
+					}}
+					defaultValue={TargetLanguages.EN}>
+					<SelectTrigger className="w-[180px]">
+						<SelectValue placeholder="Konuşulan Dil" />
+					</SelectTrigger>
+					<SelectContent className="bg-black">
+						{Object.entries(languages).map(([code, name]) => (
+							<SelectItem
+								value={code}
+								key={code}>
+								{name}
+							</SelectItem>
+						))}
+					</SelectContent>
+				</Select>
+			</div>
+			<Button onClick={isListening ? stopListening : startListening}>
+				{isListening ? "Dinlemeyi durdur" : "Dinlemeyi başlat"}
+			</Button>
+			{isListening && (
+				<>
+					<div className="-z-10">Transkript: {text}</div>
+					<div className="-z-10">Çeviri: {translatedText}</div>
+				</>
+			)}
+			{receivedMessage && (
+				<div>
+					<Button onClick={() => ttsHandler({ text: translatedText, targetLang })}>Sesli Oku</Button>
+				</div>
+			)}
+		</div>
+	);
+}
+
+enum TargetLanguages {
+	EN = "en-US",
+	TR = "TR",
+}
+
+const languages = {
+	TR: "Türkçe",
+	"en-US": "İngilizce",
+};
