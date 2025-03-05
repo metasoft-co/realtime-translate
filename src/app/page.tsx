@@ -23,12 +23,17 @@ export default function SpeechToText() {
 	const [sourceLang, setSourceLang] = useState<DeeplLanguages>(DeeplLanguages.TR);
 	const [targetLang, setTargetLang] = useState<DeeplLanguages>(DeeplLanguages.EN);
 	const [receivedMessage, setReceivedMessage] = useState<string>("");
-
+	const [ttsAudio, setTtsAudio] = useState<Blob | null>(null);
 	const recognitionRef = useRef<typeof SpeechRecognition | null>(null);
-
+	const ttsAudioRef = useRef<HTMLAudioElement | null>(null);
 	useEffect(() => {
 		const messageHandler = ({ text }: { text: string }) => {
-			setReceivedMessage(text);
+			ttsGenerator(text, TTSLanguages.EN).then((res) => {
+				if (res.status) {
+					setTtsAudio(res.audio);
+					setReceivedMessage(text);
+				}
+			});
 		};
 
 		socket.on("message", messageHandler);
@@ -47,6 +52,8 @@ export default function SpeechToText() {
 			toast.error("Konuşulan ve hedef dili seçmelisiniz");
 			return;
 		}
+		setTranslatedText("");
+		setText("");
 		let transcript = "";
 		const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 		const recognition = new SpeechRecognition();
@@ -108,16 +115,47 @@ export default function SpeechToText() {
 		}
 	};
 
-	const ttsHandler = ({ targetLang }: { targetLang: DeeplLanguages }) => {
-		const voicesList = window.speechSynthesis.getVoices();
-		const msg = new SpeechSynthesisUtterance();
-		const ttsLang = targetLang === DeeplLanguages.TR ? TTSLanguages.TR : TTSLanguages.EN;
-		msg.text = receivedMessage;
-		msg.lang = ttsLang;
-		msg.voice = voicesList.find((voice) => voice.lang === ttsLang) || null;
-		window.speechSynthesis.speak(msg);
+	const ttsGenerator = async (text: string, targetLang: TTSLanguages) => {
+		try {
+			const res = await axios.post(
+				"/api/tts",
+				{
+					text,
+					targetLang,
+				},
+				{
+					responseType: "blob",
+				}
+			);
+			return { status: true, audio: res.data };
+		} catch (error) {
+			console.log("Error while generating tts:", error);
+			return { status: false, error: "Bir hata oluştu" };
+		}
 	};
 
+	const ttsHandler = () => {
+		ttsAudioRef.current?.play();
+	};
+
+	const sourceLangHandler = (lang: DeeplLanguages) => {
+		if (lang == DeeplLanguages.TR) {
+			setSourceLang(DeeplLanguages.TR);
+			setTargetLang(DeeplLanguages.EN);
+		} else {
+			setSourceLang(DeeplLanguages.EN);
+			setTargetLang(DeeplLanguages.TR);
+		}
+	};
+	const targetLangHandler = (lang: DeeplLanguages) => {
+		if (lang == DeeplLanguages.TR) {
+			setTargetLang(DeeplLanguages.TR);
+			setSourceLang(DeeplLanguages.EN);
+		} else {
+			setTargetLang(DeeplLanguages.EN);
+			setSourceLang(DeeplLanguages.TR);
+		}
+	};
 	return (
 		<div className="w-full min-h-screen flex flex-col items-center py-20 gap-5">
 			<Toaster
@@ -129,8 +167,9 @@ export default function SpeechToText() {
 				<Label className="mb-2">KONUŞULAN DİL:</Label>
 				<Select
 					onValueChange={(val) => {
-						setSourceLang(val as DeeplLanguages);
+						sourceLangHandler(val as DeeplLanguages);
 					}}
+					value={sourceLang}
 					defaultValue={DeeplLanguages.TR}>
 					<SelectTrigger className="w-[180px]">
 						<SelectValue placeholder="Konuşulan Dil" />
@@ -151,8 +190,9 @@ export default function SpeechToText() {
 				<Label className="mb-2">HEDEF Dil:</Label>
 				<Select
 					onValueChange={(val) => {
-						setTargetLang(val as DeeplLanguages);
+						targetLangHandler(val as DeeplLanguages);
 					}}
+					value={targetLang}
 					defaultValue={DeeplLanguages.EN}>
 					<SelectTrigger className="w-[180px]">
 						<SelectValue placeholder="Konuşulan Dil" />
@@ -175,7 +215,16 @@ export default function SpeechToText() {
 			{translatedText && <div className="-z-10">Çeviri: {translatedText}</div>}
 			{receivedMessage && (
 				<div>
-					<Button onClick={() => ttsHandler({ targetLang })}>Sesli Oku</Button>
+					<Button onClick={ttsHandler}>Sesli Oku</Button>
+				</div>
+			)}
+			{ttsAudio && (
+				<div className="hidden">
+					<audio
+						ref={ttsAudioRef}
+						controls
+						src={URL.createObjectURL(ttsAudio)}
+					/>
 				</div>
 			)}
 		</div>
@@ -193,6 +242,6 @@ const deeplLanguages = {
 };
 
 enum TTSLanguages {
-	EN = "en-US",
-	TR = "tr-TR",
+	EN = "EN",
+	TR = "TR",
 }
