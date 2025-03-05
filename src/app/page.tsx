@@ -73,7 +73,7 @@ export default function SpeechToText() {
 
 		recognition.onend = async () => {
 			if (isListening) {
-				recognition.start(); // Restart if still active
+				recognition.start();
 			} else {
 				setIsListening(false);
 				const translatedText = await translate(transcript, targetLang!);
@@ -109,9 +109,11 @@ export default function SpeechToText() {
 	};
 
 	const ttsHandler = ({ targetLang }: { targetLang: TargetLanguages }) => {
+		const voicesList = window.speechSynthesis.getVoices();
 		const msg = new SpeechSynthesisUtterance();
 		msg.text = receivedMessage;
 		msg.lang = targetLang;
+		msg.voice = voicesList.find((voice) => voice.lang === targetLang) || null;
 		window.speechSynthesis.speak(msg);
 	};
 
@@ -168,12 +170,8 @@ export default function SpeechToText() {
 			<Button onClick={isListening ? stopListening : startListening}>
 				{isListening ? "Dinlemeyi durdur" : "Dinlemeyi başlat"}
 			</Button>
-			{isListening && (
-				<>
-					<div className="-z-10">Transkript: {text}</div>
-					<div className="-z-10">Çeviri: {translatedText}</div>
-				</>
-			)}
+			{isListening && <div className="-z-10">Transkript: {text}</div>}
+			{translatedText && <div className="-z-10">Çeviri: {translatedText}</div>}
 			{receivedMessage && (
 				<div>
 					<Button onClick={() => ttsHandler({ targetLang })}>Sesli Oku</Button>
