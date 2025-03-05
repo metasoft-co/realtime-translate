@@ -20,8 +20,8 @@ export default function SpeechToText() {
 	const [text, setText] = useState("");
 	const [translatedText, setTranslatedText] = useState("");
 	const [isListening, setIsListening] = useState(false);
-	const [sourceLang, setSourceLang] = useState<TargetLanguages>(TargetLanguages.TR);
-	const [targetLang, setTargetLang] = useState<TargetLanguages>(TargetLanguages.EN);
+	const [sourceLang, setSourceLang] = useState<DeeplLanguages>(DeeplLanguages.TR);
+	const [targetLang, setTargetLang] = useState<DeeplLanguages>(DeeplLanguages.EN);
 	const [receivedMessage, setReceivedMessage] = useState<string>("");
 
 	const recognitionRef = useRef<typeof SpeechRecognition | null>(null);
@@ -88,7 +88,7 @@ export default function SpeechToText() {
 		recognition.start();
 	};
 
-	const translate = async (text: string, targetLang: TargetLanguages) => {
+	const translate = async (text: string, targetLang: DeeplLanguages) => {
 		try {
 			const res = await axios.post("/api/translate", {
 				text,
@@ -108,11 +108,11 @@ export default function SpeechToText() {
 		}
 	};
 
-	const ttsHandler = ({ targetLang }: { targetLang: TargetLanguages }) => {
+	const ttsHandler = ({ targetLang }: { targetLang: DeeplLanguages }) => {
 		const voicesList = window.speechSynthesis.getVoices();
 		const msg = new SpeechSynthesisUtterance();
 		msg.text = receivedMessage;
-		msg.lang = targetLang;
+		msg.lang = targetLang === DeeplLanguages.TR ? TTSLanguages.TR : TTSLanguages.EN;
 		msg.voice = voicesList.find((voice) => voice.lang === targetLang) || null;
 		window.speechSynthesis.speak(msg);
 	};
@@ -128,14 +128,14 @@ export default function SpeechToText() {
 				<Label className="mb-2">KONUŞULAN DİL:</Label>
 				<Select
 					onValueChange={(val) => {
-						setSourceLang(val as TargetLanguages);
+						setSourceLang(val as DeeplLanguages);
 					}}
-					defaultValue={TargetLanguages.TR}>
+					defaultValue={DeeplLanguages.TR}>
 					<SelectTrigger className="w-[180px]">
 						<SelectValue placeholder="Konuşulan Dil" />
 					</SelectTrigger>
 					<SelectContent className="bg-black">
-						{Object.entries(languages).map(([code, name]) => (
+						{Object.entries(deeplLanguages).map(([code, name]) => (
 							<SelectItem
 								value={code}
 								key={code}>
@@ -150,14 +150,14 @@ export default function SpeechToText() {
 				<Label className="mb-2">HEDEF Dil:</Label>
 				<Select
 					onValueChange={(val) => {
-						setTargetLang(val as TargetLanguages);
+						setTargetLang(val as DeeplLanguages);
 					}}
-					defaultValue={TargetLanguages.EN}>
+					defaultValue={DeeplLanguages.EN}>
 					<SelectTrigger className="w-[180px]">
 						<SelectValue placeholder="Konuşulan Dil" />
 					</SelectTrigger>
 					<SelectContent className="bg-black">
-						{Object.entries(languages).map(([code, name]) => (
+						{Object.entries(deeplLanguages).map(([code, name]) => (
 							<SelectItem
 								value={code}
 								key={code}>
@@ -181,12 +181,17 @@ export default function SpeechToText() {
 	);
 }
 
-enum TargetLanguages {
+enum DeeplLanguages {
 	EN = "en-US",
 	TR = "TR",
 }
 
-const languages = {
+const deeplLanguages = {
 	TR: "Türkçe",
 	"en-US": "İngilizce",
 };
+
+enum TTSLanguages {
+	EN = "en-US",
+	TR = "tr-TR",
+}
