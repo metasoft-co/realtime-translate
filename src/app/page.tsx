@@ -111,9 +111,10 @@ export default function SpeechToText() {
 	const ttsHandler = ({ targetLang }: { targetLang: DeeplLanguages }) => {
 		const voicesList = window.speechSynthesis.getVoices();
 		const msg = new SpeechSynthesisUtterance();
+		const ttsLang = targetLang === DeeplLanguages.TR ? TTSLanguages.TR : TTSLanguages.EN;
 		msg.text = receivedMessage;
-		msg.lang = targetLang === DeeplLanguages.TR ? TTSLanguages.TR : TTSLanguages.EN;
-		msg.voice = voicesList.find((voice) => voice.lang === targetLang) || null;
+		msg.lang = ttsLang;
+		msg.voice = voicesList.find((voice) => voice.lang === ttsLang) || null;
 		window.speechSynthesis.speak(msg);
 	};
 
